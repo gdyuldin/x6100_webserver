@@ -1,0 +1,8 @@
+% rebase('base.html', title='File browser')
+<i class="si-folder"></i> <a href="..">..</a><br/>
+% for item in dirs:
+<i class="si-folder"></i> <a href="{{item}}/">{{item}}</a><br/>
+% end
+% for item in files:
+<i class="si-file"></i> <a href="{{item}}">{{item}}</a><br/>
+% end

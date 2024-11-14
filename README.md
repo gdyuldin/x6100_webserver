@@ -5,6 +5,8 @@
 Install dev version of the package:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
