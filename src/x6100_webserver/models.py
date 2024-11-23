@@ -12,7 +12,7 @@ class BandParams:
     start_freq: int
     stop_freq: int
     type: int
-    id: int | None
+    id: int | None = None
     params: dict = dataclasses.field(default_factory=dict)
 
     def __post_init__(self):
@@ -32,6 +32,10 @@ class BandParams:
                 raise ValueError(
                     f"Stop freq {self.stop_freq} overlap with band {b.name}"
                 )
+            if b.start_freq <= self.start_freq and b.stop_freq >= self.stop_freq:
+                raise ValueError(f"Band {self.name} overlap with band {b.name}")
+            if b.start_freq >= self.start_freq and b.stop_freq <= self.stop_freq:
+                raise ValueError(f"Band {self.name} overlap with band {b.name}")
 
     def asdict(self):
         return dataclasses.asdict(self)
@@ -81,10 +85,15 @@ def update_band(con: sqlite3.Connection, data: BandParams):
                 "UPDATE band_params SET val = ? WHERE bands_id = ? AND name = ?",
                 (data.start_freq, data.id, key),
             )
+    if "vfoa_mode" in band_to_update.params:
+        cur.execute(
+            "UPDATE band_params SET val = ? WHERE bands_id = ? AND name = ?",
+            (data.params["vfoa_mode"], data.id, "vfoa_mode"),
+        )
 
 
 def add_band(con: sqlite3.Connection, data: BandParams):
-    exists_bands = read_bands(con)
+    exists_bands: list[BandParams] = read_bands(con)
     data.check_overlaps(exists_bands)
     cur = con.execute(
         "INSERT INTO bands (name, start_freq, stop_freq, type) "
@@ -96,7 +105,7 @@ def add_band(con: sqlite3.Connection, data: BandParams):
         raise RuntimeError("Can't create new band")
     if 'vfoa_freq' not in data.params:
         data.params['vfoa_freq'] = data.start_freq
-    if 'vfoa_mode' not in data:
+    if 'vfoa_mode' not in data.params:
         if data.start_freq < 10_000_000:
             mode = MODE_LSB
         else:

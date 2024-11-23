@@ -26,8 +26,8 @@ def get_bands(dbcon):
 @app.put('/api/bands')
 def save_band(dbcon):
     data = bottle.request.json
-    band_param = models.BandParams(**data)
     try:
+        band_param = models.BandParams(**data)
         models.add_band(dbcon, band_param)
         bottle.response.status = 201
         return {"status": "OK"}
@@ -39,8 +39,8 @@ def save_band(dbcon):
 @app.post('/api/bands/<band_id:int>')
 def update_band(band_id, dbcon):
     data = bottle.request.json
-    band_param = models.BandParams(id=band_id, **data)
     try:
+        band_param = models.BandParams(id=band_id, **data)
         models.update_band(dbcon, band_param)
         return {"status": "OK"}
     except ValueError as e:

@@ -3,7 +3,8 @@
 
 <div id="example-table"></div>
 
-<i class="si-plus-circle"></i>
+
+<button id="add_band">Add new band</button>
 <table id="bands">
   <thead>
     <tr>
@@ -12,12 +13,11 @@
       <th>Stop, MHz</th>
       <th>Modulation</th>
       <th>Is active</th>
-      <th>Actions</tr>
+      <th style="width: 15%;">Actions</tr>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
-<button>Add new</button>
 <script>
 
 const mode_map = {
@@ -33,56 +33,177 @@ const mode_map = {
 
 const table_el = $("#bands>tbody")[0];
 
-var setEditMode = function(e) {
-  let row = $(e.currentTarget).parents("tr");
-  let data = row.data();
-  let cells = row.children();
-  cells[0].innerHTML = `<input type="text" value="${data.name}"/>`
-  cells[1].innerHTML = `<input type="number" value="${data.start_freq / 1000000}" step="0.001" min="0"/>`
-  cells[2].innerHTML = `<input type="number" value="${data.stop_freq / 1000000}" step="0.001" min="0"/>`
-  // Add select for modulation
-  cells[4].innerHTML = `<input type="checkbox" ${data.type ? "checked" : ""}/>`
-  cells[5].innerHTML = '<i class="si-disk action"> <i class="si-close action">'
+var loadData = function () {
+  $.get('/api/bands', {}, function(data) {
+    table_el.innerHTML = "";
+    for (const i in data) {
+      let row = addRow();
+      row.id = data[i].id;
+      $(row).data(data[i]);
+      fillRow($(row));
+    }
+  });
 }
 
-// Load bands
-$.get('/api/bands', {}, function(data) {
-  for (const i in data) {
-    let row = document.createElement('tr');
-    row.id = data[i].id;
-    $(row).data(data[i]);
-    table_el.appendChild(row);
+var fillRow = function(row) {
+  let data = row.data();
+  let name_td = row.children("td").get(0);
+  name_td.textContent = data.name;
 
-    let name_td = document.createElement('td');
-    name_td.textContent = data[i].name;
-    row.appendChild(name_td);
+  let start_td = row.children("td").get(1);
+  start_td.textContent = (data.start_freq / 1000000).toFixed(3);
 
-    let start_td = document.createElement('td');
-    start_td.textContent = data[i].start_freq / 1000000;
-    row.appendChild(start_td);
+  let stop_td = row.children("td").get(2);
+  stop_td.textContent = (data.stop_freq / 1000000).toFixed(3);
 
-    let stop_td = document.createElement('td');
-    stop_td.textContent = data[i].stop_freq / 1000000;
-    row.appendChild(stop_td);
+  let mode_td = row.children("td").get(3);
+  const mode_str = mode_map[data.params.vfoa_mode];
+  mode_td.textContent = mode_str;
 
-    let mode_td = document.createElement('td');
-    const mode_str = mode_map[data[i].params.vfoa_mode];
-    mode_td.textContent = mode_str;
-    row.appendChild(mode_td);
+  let active_td = row.children("td").get(4);
+  active_td.innerHTML = data.type ? '<i class="si-check-square"></i>': '<i class="si-square"></i>';
 
-    let active_td = document.createElement('td');
-    active_td.textContent = data[i].type ? 'Y': 'N';
-    row.appendChild(active_td);
+  let actions_td = row.children("td").get(5);
+  actions_td.innerHTML = '<button class="edit action"><i class="si-edit"></i></button> <button class="remove action"><i class="si-trash"></i></button>';
+  $(actions_td).find('.edit').on('click', setEditMode);
+  $(actions_td).find('.remove').on('click', removeRow);
+}
 
-    let actions_td = document.createElement('td');
-    let edit_el = document.createElement('i');
-    edit_el.className = "si-edit action";
-    edit_el.addEventListener("click", setEditMode);
-    actions_td.appendChild(edit_el);
-    // actions_td.innerHTML = '<i class="si-edit"></i> <i class="si-trash"></i> <i class="si-disk"></i>';
-    // actions_td.innerHTML = "<button>Delete</button><br/><button>Save</button>"
-    row.appendChild(actions_td);
+var setEditMode = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  for (const r of $(e.currentTarget).parents("tbody").find("tr")) {
+    if (r !== row) {
+      $(r).find(".action").hide();
+    }
   }
+  let data = row.data();
+  let cells = row.children();
+  cells[0].innerHTML = `<input type="text" value="${data.name}"/>`;
+  cells[1].innerHTML = `<input type="number" value="${data.start_freq / 1000000}" step="0.001" min="0"/>`;
+  cells[2].innerHTML = `<input type="number" value="${data.stop_freq / 1000000}" step="0.001" min="0"/>`;
+  cells[3].innerHTML = "<select></select>";
+  select_el = $(cells[3]).find("select");
+  for (const key in mode_map) {
+    let option = document.createElement('option');
+    option.value = key;
+    if (key == data.params.vfoa_mode) {
+      option.selected = true;
+    }
+    option.innerText = mode_map[key]
+    select_el.append(option)
+  }
+  cells[4].innerHTML = `<input type="checkbox" ${data.type ? "checked" : ""}/>`;
+  cells[5].innerHTML = '<button class="save action"><i class="si-disk"></i></button> <button class="close action"><i class="si-close"></i></button>';
+  $(cells[5]).find('.close').on("click", closeEditMode);
+  $(cells[5]).find('.save').on("click", saveRow);
+}
+
+var closeEditMode = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  let data = row.data();
+  if (data.id === null) {
+    row.remove();
+  } else {
+    fillRow(row);
+  }
+  $(".action").show();
+}
+
+var removeRow = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  let data = row.data();
+  if (confirm(`Remove band ${data.name}?`) == true) {
+    if (data.id === null) {
+      // Simple remove
+      row.remove();
+    } else {
+      // Perform request
+      $.ajax({
+        url: "/api/bands/" + data.id,
+        method: "DELETE",
+        success: function(result) {
+          console.log(data);
+          loadData();
+        }
+      })
+    }
+  } else {
+    return;
+  }
+}
+
+var saveRow = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  let data = row.data();
+  let cells = row.children("td");
+  console.log($(cells[0]).find('input'))
+  let new_data = {
+    name: $(cells[0]).find('input')[0].value,
+    start_freq: $(cells[1]).find('input')[0].value * 1_000_000,
+    stop_freq: $(cells[2]).find('input')[0].value * 1_000_000,
+    params: {
+      vfoa_mode: Number($(cells[3]).find('select')[0].value),
+    },
+    type: Number($(cells[4]).find('input')[0].checked),
+  }
+  let url, method;
+  console.log("Data to send", new_data);
+  console.log(data);
+  if (data.id === null) {
+    url = "/api/bands";
+    method = "PUT"
+  } else {
+    url = "/api/bands/" + data.id;
+    method = "POST"
+  }
+  $.ajax({
+    url: url,
+    type: method,
+    data: JSON.stringify(new_data),
+    contentType: "application/json; charset=utf-8",
+    dataType: "json",
+    success: function(response) {
+      if (response.status == "OK") {
+        loadData();
+        $(".action").show();
+      }
+    },
+    error: function(xhr, status, error) {
+      alert(xhr.responseJSON.msg);
+      console.log(xhr.responseText)
+    }
+  });
+}
+
+var addRow = function(at_start=false) {
+  let row = document.createElement('tr');
+  row.innerHTML = "<td></td><td class='freq_cell'></td><td class='freq_cell'></td><td></td><td></td><td></td>";
+  if (!at_start) {
+    table_el.appendChild(row);
+  } else {
+    table_el.prepend(row);
+  }
+  return row;
+}
+
+$("#add_band").on("click", function (e) {
+  let row = addRow(true);
+  row.id = null;
+  $(row).data({
+    id: null,
+    name: "New",
+    start_freq: 14_000_000,
+    stop_freq: 14_350_000,
+    params: {
+      vfoa_mode: 2,
+    },
+    type: 1,
+  });
+  fillRow($(row));
+  let event = {currentTarget: $(row).children()[0]};
+  setEditMode(event);
 });
+
+loadData();
 
 </script>

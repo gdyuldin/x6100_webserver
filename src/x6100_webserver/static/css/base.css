@@ -1,3 +1,11 @@
 .action {
     cursor: pointer;
 }
+
+.freq_cell {
+    text-align: right;
+}
+
+#bands input:not([type="checkbox"]),select {
+    width: 80%;
+}
