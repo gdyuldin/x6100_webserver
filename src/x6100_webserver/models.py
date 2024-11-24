@@ -26,16 +26,16 @@ class BandParams:
         for b in exists:
             if b.start_freq < self.start_freq < b.stop_freq:
                 raise ValueError(
-                    f"Start freq {self.start_freq} overlap with band {b.name}"
+                    f'Start freq {self.start_freq} overlap with band "{b.name}"'
                 )
             if b.start_freq < self.stop_freq < b.stop_freq:
                 raise ValueError(
-                    f"Stop freq {self.stop_freq} overlap with band {b.name}"
+                    f'Stop freq {self.stop_freq} overlap with band "{b.name}"'
                 )
             if b.start_freq <= self.start_freq and b.stop_freq >= self.stop_freq:
-                raise ValueError(f"Band {self.name} overlap with band {b.name}")
+                raise ValueError(f'Band "{self.name}" overlap with band "{b.name}"')
             if b.start_freq >= self.start_freq and b.stop_freq <= self.stop_freq:
-                raise ValueError(f"Band {self.name} overlap with band {b.name}")
+                raise ValueError(f'Band "{self.name}" overlap with band "{b.name}"')
 
     def asdict(self):
         return dataclasses.asdict(self)

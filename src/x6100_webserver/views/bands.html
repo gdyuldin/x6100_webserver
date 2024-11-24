@@ -8,16 +8,29 @@
 <table id="bands">
   <thead>
     <tr>
-      <th>Name</th>
-      <th>Start, MHz</th>
-      <th>Stop, MHz</th>
-      <th>Modulation</th>
-      <th>Is active</th>
-      <th style="width: 15%;">Actions</tr>
+      <th class="name hdr">Name</th>
+      <th class="freq hdr">Start,<br/>MHz</th>
+      <th class="freq hdr">Stop,<br/>MHz</th>
+      <th class="hdr">Mode</th>
+      <th class="hdr">Active</th>
+      <th style="min-width: 6em;">Actions</tr>
     </tr>
   </thead>
   <tbody></tbody>
 </table>
+
+<template id="row-tpl">
+  <tr>
+    <td></td><td class='freq_cell'></td><td class='freq_cell'></td><td></td><td></td>
+    <td class='action-cell'>
+      <button class="edit action"><i class="si-edit"></i></button>
+      <button class="remove action"><i class="si-trash"></i></button>
+      <button class="save action"><i class="si-disk"></i></button>
+      <button class="close action"><i class="si-close"></i></button>
+    </td>
+  </tr>
+</template>
+
 <script>
 
 const mode_map = {
@@ -63,10 +76,11 @@ var fillRow = function(row) {
   let active_td = row.children("td").get(4);
   active_td.innerHTML = data.type ? '<i class="si-check-square"></i>': '<i class="si-square"></i>';
 
-  let actions_td = row.children("td").get(5);
-  actions_td.innerHTML = '<button class="edit action"><i class="si-edit"></i></button> <button class="remove action"><i class="si-trash"></i></button>';
-  $(actions_td).find('.edit').on('click', setEditMode);
-  $(actions_td).find('.remove').on('click', removeRow);
+  let actions_td = row.children("td:nth-child(6)");
+  $('.edit', actions_td).show();
+  $('.remove', actions_td).show();
+  $('.save', actions_td).hide();
+  $('.close', actions_td).hide();
 }
 
 var setEditMode = function(e) {
@@ -93,9 +107,10 @@ var setEditMode = function(e) {
     select_el.append(option)
   }
   cells[4].innerHTML = `<input type="checkbox" ${data.type ? "checked" : ""}/>`;
-  cells[5].innerHTML = '<button class="save action"><i class="si-disk"></i></button> <button class="close action"><i class="si-close"></i></button>';
-  $(cells[5]).find('.close').on("click", closeEditMode);
-  $(cells[5]).find('.save').on("click", saveRow);
+  $(cells[5]).find('.close').show();
+  $(cells[5]).find('.save').show();
+  $(cells[5]).find('.edit').hide();
+  $(cells[5]).find('.remove').hide();
 }
 
 var closeEditMode = function(e) {
@@ -106,13 +121,14 @@ var closeEditMode = function(e) {
   } else {
     fillRow(row);
   }
-  $(".action").show();
+  $(".action.edit, .action.remove").show();
+  $(".action.save, .action.close").hide();
 }
 
 var removeRow = function(e) {
   let row = $(e.currentTarget).parents("tr");
   let data = row.data();
-  if (confirm(`Remove band ${data.name}?`) == true) {
+  if (confirm(`Remove band "${data.name}"?`) == true) {
     if (data.id === null) {
       // Simple remove
       row.remove();
@@ -176,8 +192,7 @@ var saveRow = function(e) {
 }
 
 var addRow = function(at_start=false) {
-  let row = document.createElement('tr');
-  row.innerHTML = "<td></td><td class='freq_cell'></td><td class='freq_cell'></td><td></td><td></td><td></td>";
+  let row = document.getElementById("row-tpl").content.querySelector("tr").cloneNode(true);
   if (!at_start) {
     table_el.appendChild(row);
   } else {
@@ -203,6 +218,12 @@ $("#add_band").on("click", function (e) {
   let event = {currentTarget: $(row).children()[0]};
   setEditMode(event);
 });
+
+$("#bands>tbody")
+  .on("click", ".edit", setEditMode)
+  .on("click", ".remove", removeRow)
+  .on("click", ".save", saveRow)
+  .on("click", ".close", closeEditMode);
 
 loadData();
 
