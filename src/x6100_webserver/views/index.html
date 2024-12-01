@@ -1,2 +1,17 @@
 % rebase('base.html', title='Main Page')
-<p>Page Content ...</p>
+<p>Welcome to X6100 alternative firmware configuration editor.</p>
+<section>
+    <h3>Bands editor</h3>
+    <p>Allows to add/change/remove bands. Active column is to bind band to up/down buttons.</p>
+</section>
+<section>
+    <h3>Digital modes editor</h3>
+    <p>Allows to add/change/remove frequencies for FT8/FT4</p>
+</section>
+<section>
+    <h3>File browser</h3>
+    <p>Allows to download files from the DATA partition of the SD card (ADI file, screenshoots, recordings, etc).</p>
+    <p><b>Note:</b> there is a small probability, that <code>params.db</code> might be changed during downloading
+        and downloaded version might be corrupted. This will not affect <code>params.db</code> on the radio.
+        You can check downloaded file with opening it using any SQLite3 tool.</p>
+</section>
