@@ -30,3 +30,7 @@ th.hdr.freq {
 th.hdr.name {
     width: 30%;
 }
+
+#digital_modes {
+    min-width: 100%;
+}

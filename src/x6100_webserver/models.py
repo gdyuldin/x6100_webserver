@@ -122,3 +122,52 @@ def add_band(con: sqlite3.Connection, data: BandParams):
 def delete_band(con: sqlite3.Connection, band_id):
     cur = con.execute("DELETE FROM bands WHERE id = ?", (band_id,))
     cur.execute("DELETE FROM band_params WHERE bands_id = ?", (band_id,))
+
+
+@dataclasses.dataclass(kw_only=True, frozen=True)
+class DigitalMode:
+    label: str
+    freq: int
+    mode: int
+    type: int
+    id: int | None = None
+
+    def asdict(self):
+        return dataclasses.asdict(self)
+
+def read_digital_modes(con: sqlite3.Connection):
+    keys = ["id", "label", "freq", "mode", "type"]
+    d_modes = []
+    for row in con.execute(f"SELECT {','.join(keys)} FROM digital_modes ORDER BY freq ASC"):
+        d_mode = dict(zip(keys, row))
+        d_mode = DigitalMode(**d_mode)
+        d_modes.append(d_mode)
+    return d_modes
+
+
+def add_digital_mode(con: sqlite3.Connection, data: DigitalMode):
+    cur = con.execute(
+        "INSERT INTO digital_modes (label, freq, mode, type) "
+        "VALUES (:label, :freq, :mode, :type)",
+        data.asdict(),
+    )
+    row_id = cur.lastrowid
+    if row_id is None:
+        raise RuntimeError("Can't create new band")
+    return row_id
+
+
+def update_digital_mode(con: sqlite3.Connection, data: DigitalMode):
+    # Try update
+    cur = con.execute(
+        "UPDATE digital_modes SET "
+        "label = :label, freq = :freq, mode = :mode, "
+        "type=:type WHERE id = :id",
+        data.asdict(),
+    )
+    if cur.rowcount == 0:
+        raise RuntimeError(f"Can't update band parameters with id={data.id}")
+
+
+def delete_digital_mode(con: sqlite3.Connection, mode_id):
+    cur = con.execute("DELETE FROM digital_modes WHERE id = ?", (mode_id,))

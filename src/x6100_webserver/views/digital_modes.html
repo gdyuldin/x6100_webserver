@@ -1,0 +1,240 @@
+% rebase('base.html', title='Digital modes editor')
+<h3>Digital modes</h3>
+
+<button id="add_mode">Add new</button>
+<table id="digital_modes">
+  <thead>
+    <tr>
+      <th class="name">Label</th>
+      <th class="freq">Freq,<br/>MHz</th>
+      <th class="">Mode</th>
+      <th class="">Type</th>
+      <th style="min-width: 6em;">Actions</tr>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
+<template id="row-tpl">
+  <tr>
+    <td></td>
+    <td class='freq_cell'></td>
+    <td></td>
+    <td></td>
+    <td class='action-cell'>
+      <button class="edit action"><i class="si-edit"></i></button>
+      <button class="remove action"><i class="si-trash"></i></button>
+      <button class="save action"><i class="si-disk"></i></button>
+      <button class="close action"><i class="si-close"></i></button>
+    </td>
+  </tr>
+</template>
+
+<script>
+
+const type_map = {
+  0: "FT8",
+  1: "FT4",
+};
+
+const table_el = $("#digital_modes>tbody")[0];
+
+var addRow = function(at_start=false) {
+  let row = document.getElementById("row-tpl").content.querySelector("tr").cloneNode(true);
+  if (!at_start) {
+    table_el.appendChild(row);
+  } else {
+    table_el.prepend(row);
+  }
+  return row;
+}
+
+var fillRow = function(row) {
+  let data = row.data();
+  let name_td = row.children("td").get(0);
+  name_td.textContent = data.label;
+
+  let freq_td = row.children("td").get(1);
+  freq_td.textContent = (data.freq / 1000000).toFixed(3);
+
+  let mode_td = row.children("td").get(2);
+  const mode_str = mode_map[data.mode];
+  mode_td.textContent = mode_str;
+
+  let type_td = row.children("td").get(3);
+  const type_str = type_map[data.type];
+  type_td.textContent = type_str;
+
+  let actions_td = row.children("td:nth-child(5)");
+  $('.edit', actions_td).show();
+  $('.remove', actions_td).show();
+  $('.save', actions_td).hide();
+  $('.close', actions_td).hide();
+}
+
+var loadData = function () {
+  $.get('/api/digital_modes', {}, function(data) {
+    table_el.innerHTML = "";
+    for (const i in data) {
+      let row = addRow();
+      row.id = data[i].id;
+      $(row).data(data[i]);
+      fillRow($(row));
+    }
+  });
+}
+
+var setEditMode = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  for (const r of $(e.currentTarget).parents("tbody").find("tr")) {
+    if (r !== row) {
+      $(r).find(".action").hide();
+    }
+  }
+  let data = row.data();
+  let cells = row.children();
+  cells[0].innerHTML = `<input type="text" value="${data.label}"/>`;
+  cells[1].innerHTML = `<input type="number" value="${data.freq / 1000000}" step="0.001" min="0"/>`;
+
+  let mode_td = cells[2];
+  mode_td.innerHTML = "<select></select>";
+  select_el = $(mode_td).find("select");
+  for (const key in mode_map) {
+    let option = document.createElement('option');
+    option.value = key;
+    if (key == data.mode) {
+      option.selected = true;
+    }
+    option.innerText = mode_map[key]
+    select_el.append(option)
+  }
+
+  let type_td = cells[3];
+  type_td.innerHTML = "<select></select>";
+  select_el = $(type_td).find("select");
+  for (const key in type_map) {
+    let option = document.createElement('option');
+    option.value = key;
+    if (key == data.type) {
+      option.selected = true;
+    }
+    option.innerText = type_map[key]
+    select_el.append(option)
+  }
+  let actions_td = cells[4];
+  $('.edit', actions_td).hide();
+  $('.remove', actions_td).hide();
+  $('.save', actions_td).show();
+  $('.close', actions_td).show();
+}
+
+var closeEditMode = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  let data = row.data();
+  if (data.id === null) {
+    row.remove();
+  } else {
+    fillRow(row);
+  }
+  $(".action.edit, .action.remove").show();
+  $(".action.save, .action.close").hide();
+}
+
+var addRow = function(at_start=false) {
+  let row = document.getElementById("row-tpl").content.querySelector("tr").cloneNode(true);
+  if (!at_start) {
+    table_el.appendChild(row);
+  } else {
+    table_el.prepend(row);
+  }
+  return row;
+}
+
+var saveRow = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  let data = row.data();
+  let cells = row.children("td");
+  console.log($(cells[0]).find('input'))
+  let new_data = {
+    label: $(cells[0]).find('input')[0].value,
+    freq: $(cells[1]).find('input')[0].value * 1_000_000,
+    mode: Number($(cells[2]).find('select')[0].value),
+    type: Number($(cells[3]).find('select')[0].value),
+  }
+  let url, method;
+  console.log("Data to send", new_data);
+  console.log(data);
+  if (data.id === null) {
+    url = "/api/digital_modes";
+    method = "PUT"
+  } else {
+    url = "/api/digital_modes/" + data.id;
+    method = "POST"
+  }
+  $.ajax({
+    url: url,
+    type: method,
+    data: JSON.stringify(new_data),
+    contentType: "application/json; charset=utf-8",
+    dataType: "json",
+    success: function(response) {
+      if (response.status == "OK") {
+        loadData();
+        $(".action").show();
+      }
+    },
+    error: function(xhr, status, error) {
+      alert(xhr.responseJSON.msg);
+      console.log(xhr.responseText)
+    }
+  });
+}
+
+var removeRow = function(e) {
+  let row = $(e.currentTarget).parents("tr");
+  let data = row.data();
+  if (confirm(`Remove digital mode "${data.label}"?`) == true) {
+    if (data.id === null) {
+      // Simple remove
+      row.remove();
+    } else {
+      // Perform request
+      $.ajax({
+        url: "/api/digital_modes/" + data.id,
+        method: "DELETE",
+        success: function(result) {
+          console.log(data);
+          loadData();
+        }
+      })
+    }
+  } else {
+    return;
+  }
+}
+
+$("#add_mode").on("click", function (e) {
+  let row = addRow(true);
+  row.id = null;
+  $(row).data({
+    id: null,
+    label: "New",
+    freq: 14_074_000,
+    mode: 3,
+    type: 0,
+  });
+  fillRow($(row));
+  let event = {currentTarget: $(row).children()[0]};
+  setEditMode(event);
+});
+
+$(table_el)
+  .on("click", ".edit", setEditMode)
+  .on("click", ".remove", removeRow)
+  .on("click", ".save", saveRow)
+  .on("click", ".close", closeEditMode);
+
+
+loadData();
+
+</script>
