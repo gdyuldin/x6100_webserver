@@ -1,6 +1,9 @@
+from datetime import datetime, timezone, timedelta
 from importlib import resources
 import json
+import os
 import pathlib
+import subprocess
 
 import bottle
 
@@ -141,3 +144,110 @@ def files(filepath=""):
             else:
                 files.append(item.relative_to(path))
         return bottle.template('files', dirs=dirs, files=files)
+
+# Timezone routes
+
+
+@app.route('/time')
+def time_editor():
+    return bottle.template('time')
+
+
+@app.get('/api/get_time')
+def get_time():
+    tz = timezone(timedelta())
+    server_time = datetime.now(tz).isoformat()
+    bottle.response.content_type = 'application/json'
+    return {"server_time": server_time}
+
+
+def update_time_by_ntp(server_address):
+    ntp_args = ["ntpdate", "-u", server_address]
+    p = subprocess.Popen(
+        ntp_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        _, errs = p.communicate(timeout=20)
+    except subprocess.TimeoutExpired:
+        p.kill()
+        _, errs = p.communicate()
+        bottle.response.status = 500
+        return {"status": "error", "msg": "NTP update timeout"}
+
+    if p.returncode != 0:
+        bottle.response.status = 500
+        return {"status": "error", "msg": f"NTP update failed: {errs.decode()}"}
+
+    return {"status": "success", "msg": "NTP update successful"}
+
+
+@app.post('/api/update_time')
+def update_time():
+    data = bottle.request.json
+
+    update_mode = data.get("update_mode")
+    if not update_mode:
+        bottle.response.status = 400
+        return {"status": "error", "msg": "update_mode is required"}
+
+    if update_mode == "ntp":
+        server_address = data.get("server_address")
+        return update_time_by_ntp(server_address)
+
+    elif update_mode == "manual":
+        manual_time = data.get("manual_time")
+        if not manual_time:
+            bottle.response.status = 400
+            return {"status": "error", "msg": "manual_time is required"}
+
+        try:
+            # Update system time manually
+            manual_time = datetime.strptime(manual_time, "%Y-%m-%d %H:%M:%S")
+            subprocess.run(
+                ["date", "-s", manual_time.strftime("%Y-%m-%d %H:%M:%S")], check=True)
+            return {"status": "success", "msg": "Server time updated manually"}
+        except Exception as e:
+            bottle.response.status = 500
+            return {"status": "error", "msg": f"Failed to set manual time: {str(e)}"}
+
+    else:
+        bottle.response.status = 400
+        return {"status": "error", "msg": f"unknown update_mode: {update_mode}"}
+
+
+@app.get('/api/get_timezone')
+def get_timezone():
+    """Get the current server timezone."""
+    try:
+        p = subprocess.run(["realpath", "/etc/localtime"],
+                           stdout=subprocess.PIPE, check=True)
+        timezone_path = p.stdout.decode().strip()
+        tz_list = timezone_path.split("/posix/")
+        if len(tz_list) < 2:
+            tz_list = timezone_path.split("/zoneinfo/")
+        tz = tz_list[-1]
+        return {"timezone": tz}
+    except Exception as e:
+        bottle.response.status = 500
+        return {"status": "error", "msg": f"Failed to fetch timezone: {str(e)}"}
+
+
+@app.post('/api/set_timezone')
+def set_timezone():
+    """Set the server timezone."""
+    data = bottle.request.json
+    timezone = data.get("timezone")
+    if not timezone:
+        bottle.response.status = 400
+        return {"status": "error", "msg": "Timezone is required"}
+
+    target_tz = f"/usr/share/zoneinfo/{timezone}"
+    if not os.path.exists(target_tz):
+        bottle.response.status = 400
+        return {"status": "error", "msg": f"Invalid timezone: {timezone}"}
+
+    try:
+        subprocess.run(["ln", "-sf", target_tz, "/etc/localtime"], check=True)
+        return {"status": "success", "msg": "Timezone updated successfully"}
+    except subprocess.CalledProcessError as e:
+        bottle.response.status = 500
+        return {"status": "error", "msg": f"Failed to set timezone: {str(e)}"}
