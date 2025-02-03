@@ -134,6 +134,7 @@ def digital_modes():
 def files(filepath=""):
     path = pathlib.Path(settings.FILEBROWSER_PATH) / filepath
     if path.is_file():
+        os.sync()
         return bottle.static_file(str(path.relative_to(settings.FILEBROWSER_PATH)), root=settings.FILEBROWSER_PATH, download=True)
     else:
         dirs = []
