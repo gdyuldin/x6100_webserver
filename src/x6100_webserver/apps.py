@@ -135,7 +135,9 @@ def files(filepath=""):
     path = pathlib.Path(settings.FILEBROWSER_PATH) / filepath
     if path.is_file():
         os.sync()
-        return bottle.static_file(str(path.relative_to(settings.FILEBROWSER_PATH)), root=settings.FILEBROWSER_PATH, download=True)
+        response = bottle.static_file(str(path.relative_to(settings.FILEBROWSER_PATH)), root=settings.FILEBROWSER_PATH, download=True)
+        response.set_header("Cache-Control", "private, no-cache, no-store")
+        return response
     else:
         dirs = []
         files = []
